@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>客户需求调研纪要工具</title>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --danger: #dc2626;
+    --bg: #f1f5f9;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #0f172a;
+    --muted: #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    background: linear-gradient(135deg, #1e3a8a, #2563eb);
+    color: #fff;
+    padding: 20px 24px;
+  }
+  header h1 { font-size: 22px; font-weight: 600; }
+  header p { font-size: 13px; opacity: .85; margin-top: 4px; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .card h2 { font-size: 16px; margin-bottom: 14px; color: #1e3a8a; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 10px; }
+  .row:last-child { margin-bottom: 0; }
+  label { font-size: 13px; color: var(--muted); min-width: 80px; }
+  input, select {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    flex: 1;
+    min-width: 120px;
+    outline: none;
+    background: #fff;
+    color: var(--text);
+  }
+  input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+  .btn {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: .15s;
+  }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-success { background: #059669; color: #fff; }
+  .btn-success:hover:not(:disabled) { background: #047857; }
+  .btn-ghost { background: #e2e8f0; color: #334155; }
+  .btn-ghost:hover:not(:disabled) { background: #cbd5e1; }
+  .record-area { text-align: center; padding: 8px 0; }
+  .record-btn {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    border: none;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: .2s;
+    box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  }
+  .record-btn.idle { background: var(--danger); color: #fff; }
+  .record-btn.recording { background: #fff; color: var(--danger); border: 4px solid var(--danger); animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,.4);} 50% { box-shadow: 0 0 0 16px rgba(220,38,38,0);} }
+  #timer { font-size: 18px; font-weight: 700; color: var(--danger); margin-top: 10px; }
+  #status { margin-top: 6px; font-size: 13px; color: var(--muted); min-height: 18px; }
+  textarea {
+    width: 100%;
+    min-height: 160px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    font-family: "Microsoft YaHei", sans-serif;
+    resize: vertical;
+    outline: none;
+  }
+  textarea:focus { border-color: var(--primary); }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .result-label { font-size: 14px; font-weight: 600; color: #1e3a8a; margin: 4px 0 8px; }
+  .hidden { display: none; }
+  .error-msg { color: var(--danger); font-size: 13px; margin-top: 8px; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  #minutesView { white-space: pre-wrap; word-break: break-word; }
+  .model-panel {
+    margin-top: 14px;
+    padding: 16px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    background: #f8fafc;
+  }
+  .model-panel h4 { font-size: 14px; color: #1e3a8a; margin-bottom: 10px; }
+  .model-form { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .model-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; }
+  .model-table th, .model-table td { border: 1px solid var(--border); padding: 8px; text-align: left; vertical-align: middle; }
+  .model-table th { background: #f8fafc; color: #334155; }
+  .model-table td .path-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+  .mini-btn { border: none; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; margin-right: 4px; }
+  .mini-btn.edit { background: #dbeafe; color: #1d4ed8; }
+  .mini-btn.del { background: #fee2e2; color: #b91c1c; }
+  .mini-btn.toggle { background: #f1f5f9; color: #334155; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+  .badge.builtin { background: #dbeafe; color: #1d4ed8; }
+  .badge.custom { background: #dcfce7; color: #15803d; }
+  .badge.on { background: #dcfce7; color: #15803d; }
+  .badge.off { background: #f1f5f9; color: #64748b; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎙️ 客户需求调研纪要工具</h1>
+  <p>浏览器录音 → AI 转写 → 自动生成需求调研纪要（含业务流程图）→ 导出 Word / PDF / HTML / Markdown</p>
+</header>
+
+<div class="container">
+
+  <!-- 录音区 -->
+  <div class="card">
+    <h2>1️⃣ 录音</h2>
+    <div class="record-area">
+      <button id="recordBtn" class="record-btn idle">开始录音</button>
+      <div id="timer">00:00</div>
+      <div id="status">点击 [开始录音]，授权麦克风后录制客户访谈</div>
+    </div>
+  </div>
+
+  <!-- 配置区 -->
+  <div class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;flex:1;">2️⃣ 配置</h2>
+      <button id="btnTestConfig" class="btn btn-ghost">🔌 测试配置</button>
+      <button id="btnManageModels" class="btn btn-ghost">⚙️ 管理模型</button>
+    </div>
+    <div id="configStatus" class="meta"></div>
+    <div class="row">
+      <label>AI 后端</label>
+      <select id="backend">
+        <option value="openai">OpenAI 兼容 (NVIDIA/OpenAI/通义等)</option>
+        <option value="ollama">Ollama 本地</option>
+      </select>
+      <label>Whisper 模型</label>
+      <select id="model"></select>
+    </div>
+    <div class="row hidden" id="modelPathRow">
+      <label>模型地址</label>
+      <input id="modelPath" placeholder="所选模型的本地路径">
+    </div>
+    <div class="row" id="openaiRow">
+      <label>API 地址</label>
+      <input id="baseUrl" placeholder="如 https://integrate.api.nvidia.com/v1">
+      <label>模型名称</label>
+      <input id="openaiModel" placeholder="如 nvidia/nemotron-3-nano-omni-30b-a3b-reasoning">
+    </div>
+    <div class="row" id="apiKeyRow">
+      <label>API Key</label>
+      <input id="apiKey" type="password" placeholder="使用 OpenAI 兼容后端时必填，Ollama 无需填写">
+    </div>
+
+    <!-- 模型管理（内联展开，不弹窗） -->
+    <div id="modelPanel" class="model-panel hidden">
+      <div class="model-form">
+        <h4>新增 / 修改模型</h4>
+        <div class="row">
+          <label>模型名称</label>
+          <input id="mName" placeholder="如: 中文优化版">
+        </div>
+        <div class="row">
+          <label>模型地址/路径</label>
+          <input id="mPath" placeholder="本地模型目录路径，如 C:/Users/xxx/.cache/huggingface/hub/models--Systran--faster-whisper-small/snapshots/xxx">
+        </div>
+        <div class="row">
+          <label>描述(可选)</label>
+          <input id="mDesc" placeholder="说明该模型的用途或版本">
+        </div>
+        <div class="row">
+          <button id="btnSaveModel" class="btn btn-primary">保存模型</button>
+          <button id="btnCancelEdit" class="btn btn-ghost hidden">取消编辑</button>
+          <span id="modelFormMsg" class="error-msg"></span>
+        </div>
+      </div>
+      <table class="model-table">
+        <thead>
+          <tr><th>名称</th><th>路径</th><th>类型</th><th>状态</th><th>操作</th></tr>
+        </thead>
+        <tbody id="modelTbody"></tbody>
+      </table>
+      <p class="meta">提示：内置模型（tiny~large-v3）由系统提供，不可修改；自定义模型保存在服务器 .env 配置文件中，支持修改和删除。</p>
+    </div>
+  </div>
+
+  <!-- 转写结果 -->
+  <div class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;flex:1;">3️⃣ 转写结果</h2>
+      <button id="btnTranscribeFile" class="btn btn-ghost">上传本地音频转写</button>
+      <input type="file" id="audioFileInput" accept="audio/*" class="hidden">
+    </div>
+    <div id="transcriptMeta" class="meta"></div>
+    <textarea id="transcript" placeholder="点击 [开始录音] 录制，或上传本地音频文件（wav/mp3/m4a/webm 等）"></textarea>
+  </div>
+
+  <!-- 生成纪要 -->
+  <div class="card">
+    <div class="toolbar">
+      <h2 style="margin:0;flex:1;">4️⃣ 需求调研纪要</h2>
+      <button id="btnGenerate" class="btn btn-primary">🤖 生成纪要</button>
+    </div>
+    <textarea id="minutes" placeholder="点击 [生成纪要]，AI 将基于转写内容输出结构化需求调研纪要（含业务流程图）"></textarea>
+    <div id="generateError" class="error-msg"></div>
+  </div>
+
+  <!-- 导出 -->
+  <div class="card">
+    <h2>5️⃣ 导出</h2>
+    <div class="row">
+      <label>导出格式</label>
+      <select id="exportFmt">
+        <option value="md">Markdown (.md)</option>
+        <option value="html">HTML (.html)</option>
+        <option value="pdf">PDF (.pdf)</option>
+        <option value="docx">Word (.docx)</option>
+      </select>
+      <button id="btnExport" class="btn btn-success">⬇️ 导出纪要</button>
+    </div>
+    <div id="minutesView" class="hidden result-label" style="margin-top:14px;">以下为生成内容预览（Mermaid 流程图可用 Typora/VSCode 渲染）</div>
+  </div>
+
+</div>
+
+<script>
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let timerInterval = null;
+let startTime = null;
+let lastTranscript = "";
+let lastStartStr = null;
+let lastEndStr = null;
+let currentModel = "small";
+let defaultModelPath = "";
+
+const $ = id => document.getElementById(id);
+
+async function init() {
+  try {
+    const res = await fetch('/api/info');
+    const data = await res.json();
+    defaultModelPath = data.default_model_path || "";
+    populateModels(data.models || []);
+    $('backend').addEventListener('change', onBackendChange);
+    $('model').addEventListener('change', onModelChange);
+    await loadSettings();
+  } catch (e) { /* 忽略 */ }
+
+  $('recordBtn').addEventListener('click', toggleRecord);
+  $('btnTranscribeFile').addEventListener('click', () => $('audioFileInput').click());
+  $('audioFileInput').addEventListener('change', uploadAudio);
+  $('btnGenerate').addEventListener('click', generateMinutes);
+  $('btnExport').addEventListener('click', exportMinutes);
+
+  // 模型管理（内联展开）
+  $('btnManageModels').addEventListener('click', togglePanel);
+  $('btnCancelEdit').addEventListener('click', resetModelForm);
+  $('btnSaveModel').addEventListener('click', saveModel);
+  $('btnTestConfig').addEventListener('click', () => testConfig(true));
+}
+
+let modelsCache = [];
+
+function populateModels(models) {
+  modelsCache = models;
+  const sel = $('model');
+  const prev = sel.value;
+  sel.innerHTML = '';
+  models.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.source === 'custom' ? m.name : m.name;
+    opt.textContent = m.name + (m.path ? ` (${m.path})` : '');
+    if (m.source === 'custom' && !m.enabled) opt.disabled = true;
+    sel.appendChild(opt);
+  });
+  if (prev) { sel.value = prev; } else { sel.value = models.find(m => m.name === 'small') ? 'small' : (models[0] || {}).name || ''; }
+  onModelChange();
+}
+
+function onModelChange() {
+  const sel = $('model');
+  const name = sel.value;
+  const m = modelsCache.find(x => x.name === name);
+  $('modelPathRow').classList.remove('hidden');
+  if (m && m.source === 'custom' && m.path) {
+    $('modelPath').value = m.path;
+    $('modelPath').disabled = true;
+  } else if (m && m.source === 'builtin') {
+    $('modelPath').value = (defaultModelPath ? defaultModelPath + '/' : '') + name;
+    $('modelPath').disabled = true;
+  } else {
+    $('modelPath').value = '';
+    $('modelPath').disabled = false;
+  }
+}
+
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+    const s = data.settings || {};
+    if (s.backend) $('backend').value = s.backend;
+    if (s.api_key !== undefined) $('apiKey').value = s.api_key;
+    if (s.openai_base_url !== undefined) $('baseUrl').value = s.openai_base_url;
+    if (s.openai_model !== undefined) $('openaiModel').value = s.openai_model;
+    if (s.whisper_model && $('model').value !== s.whisper_model) $('model').value = s.whisper_model;
+    onBackendChange();
+    onModelChange();
+  } catch (e) { /* 忽略 */ }
+}
+
+function onBackendChange() {
+  const backend = $('backend').value;
+  const isOpenAI = backend === 'openai';
+  $('openaiRow').classList.toggle('hidden', !isOpenAI);
+  $('apiKeyRow').classList.toggle('hidden', !isOpenAI);
+}
+
+function saveSettings(patch) {
+  return fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch)
+  }).then(r => r.json());
+}
+
+// ---------- 模型管理 ----------
+function togglePanel() {
+  const panel = $('modelPanel');
+  const isHidden = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  $('btnManageModels').textContent = isHidden ? '✕ 收起模型管理' : '⚙️ 管理模型';
+  if (isHidden) renderModelTable();
+}
+
+function resetModelForm() {
+  $('mName').value = '';
+  $('mPath').value = defaultModelPath;
+  $('mDesc').value = '';
+  $('mName').disabled = false;
+  $('modelFormMsg').textContent = '';
+  $('btnSaveModel').textContent = '保存模型';
+  $('btnCancelEdit').classList.add('hidden');
+}
+
+async function renderModelTable() {
+  try {
+    const res = await fetch('/api/models');
+    const data = await res.json();
+    modelsCache = data.models || [];
+    const tbody = $('modelTbody');
+    tbody.innerHTML = '';
+    modelsCache.forEach(m => {
+      const tr = document.createElement('tr');
+      const typeBadge = m.source === 'builtin' ? '<span class="badge builtin">内置</span>' : '<span class="badge custom">自定义</span>';
+      const stateBadge = m.enabled ? '<span class="badge on">启用</span>' : '<span class="badge off">停用</span>';
+      let ops = '';
+      if (m.source === 'builtin') {
+        ops = '<span class="meta">系统</span>';
+      } else {
+        ops = `<button class="mini-btn toggle" data-action="toggle" data-name="${m.name}">${m.enabled ? '停用' : '启用'}</button>` +
+              `<button class="mini-btn edit" data-action="edit" data-name="${m.name}">修改</button>` +
+              `<button class="mini-btn del" data-action="del" data-name="${m.name}">删除</button>`;
+      }
+      tr.innerHTML = `<td>${m.name}</td><td><span class="path-cell" title="${m.path}">${m.path || '—'}</span></td>` +
+                     `<td>${typeBadge}</td><td>${stateBadge}</td><td>${ops}</td>`;
+      tbody.appendChild(tr);
+    });
+  } catch (e) {
+    $('modelFormMsg').textContent = "加载模型列表失败: " + e.message;
+  }
+}
+
+$('modelTbody').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const name = btn.dataset.name;
+  try {
+    if (action === 'del') {
+      if (!confirm(`确定删除模型「${name}」？`)) return;
+      const res = await fetch('/api/models/' + encodeURIComponent(name), { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await renderModelTable(); await refreshModelSelect();
+    } else if (action === 'toggle') {
+      const m = modelsCache.find(x => x.name === name);
+      const res = await fetch('/api/models/' + encodeURIComponent(name), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !m.enabled })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await renderModelTable(); await refreshModelSelect();
+    } else if (action === 'edit') {
+      const m = modelsCache.find(x => x.name === name);
+      $('mName').value = m.name; $('mName').disabled = true;
+      $('mPath').value = m.path; $('mDesc').value = m.desc || '';
+      $('btnSaveModel').textContent = '保存修改';
+      $('btnCancelEdit').classList.remove('hidden');
+      $('modelFormMsg').textContent = '';
+    }
+  } catch (err) {
+    $('modelFormMsg').textContent = "操作失败: " + err.message;
+  }
+});
+
+async function saveModel() {
+  const name = $('mName').value.trim();
+  const path = $('mPath').value.trim();
+  const desc = $('mDesc').value.trim();
+  const editing = !$('mName').disabled;
+  try {
+    let res;
+    if (editing) {
+      res = await fetch('/api/models/' + encodeURIComponent(name), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, desc })
+      });
+    } else {
+      res = await fetch('/api/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, path, desc })
+      });
+    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    await renderModelTable(); await refreshModelSelect();
+    resetModelForm();
+  } catch (err) {
+    $('modelFormMsg').textContent = "保存失败: " + err.message;
+  }
+}
+
+async function refreshModelSelect() {
+  try {
+    const res = await fetch('/api/models');
+    const data = await res.json();
+    populateModels(data.models || []);
+  } catch (e) { /* 忽略 */ }
+}
+
+function setStatus(msg, error) {
+  $('status').textContent = msg;
+  $('status').style.color = error ? 'var(--danger)' : 'var(--muted)';
+}
+
+// ---------- 录音 ----------
+async function toggleRecord() {
+  if (isRecording) { stopRecord(); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setStatus("浏览器不支持录音，请使用 Chrome / Edge", true);
+    return;
+  }
+  // 录音前先校验模型配置
+  const check = await testConfig(false);
+  if (!check.ok) {
+    setStatus("❌ 配置校验未通过，请先完成模型配置", true);
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+      setStatus("录音已停止，正在上传并转写...");
+      await sendAudio(blob);
+    };
+    mediaRecorder.start();
+    isRecording = true;
+    startTime = Date.now();
+    $('recordBtn').textContent = "停止";
+    $('recordBtn').className = "record-btn recording";
+    setStatus("录音中... 再次点击 [停止] 结束");
+    timerInterval = setInterval(updateTimer, 1000);
+  } catch (e) {
+    setStatus("无法访问麦克风: " + e.message, true);
+  }
+}
+
+// ---------- 配置测试 ----------
+async function testConfig(showResult = true) {
+  const backend = $('backend').value;
+  const payload = {
+    model: currentModelName(),
+    backend,
+    api_key: $('apiKey').value.trim(),
+    base_url: $('baseUrl').value.trim(),
+    openai_model: $('openaiModel').value.trim(),
+  };
+  if (showResult) {
+    $('configStatus').textContent = "正在测试配置...";
+    $('configStatus').style.color = 'var(--muted)';
+    // 测试前先保存当前页面配置，确保 .env 同步
+    try {
+      await saveSettings({
+        backend,
+        api_key: $('apiKey').value.trim(),
+        openai_base_url: $('baseUrl').value.trim(),
+        openai_model: $('openaiModel').value.trim(),
+      });
+    } catch (e) { /* 保存失败不影响测试 */ }
+  }
+  try {
+    const res = await fetch('/api/check-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!showResult) return data;
+    let html = '';
+    if (data.model) html += `✓ 转写模型: ${data.model.message}<br>`;
+    if (data.backend) html += `✓ AI 后端: ${data.backend.message}<br>`;
+    if (data.backend_test) html += `✓ 后端测试: ${data.backend_test.message}`;
+    $('configStatus').innerHTML = html;
+    $('configStatus').style.color = data.ok ? 'var(--success,#059669)' : 'var(--danger)';
+    if (!data.ok) setStatus("配置测试未通过，请按上方提示修复", true);
+    else setStatus("配置测试通过，可以开始录音");
+    return data;
+  } catch (e) {
+    if (showResult) {
+      $('configStatus').textContent = "配置测试失败: " + e.message;
+      $('configStatus').style.color = 'var(--danger)';
+    }
+    return { ok: false };
+  }
+}
+
+function stopRecord() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+}
+
+function updateTimer() {
+  const sec = Math.floor((Date.now() - startTime) / 1000);
+  const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+  const ss = String(sec % 60).padStart(2, '0');
+  $('timer').textContent = `${mm}:${ss}`;
+}
+
+// ---------- 转写 ----------
+function currentModelName() {
+  const name = $('model').value;
+  return name || $('modelPath').value.trim() || 'small';
+}
+
+async function sendAudio(blob) {
+  stopTimer();
+  isRecording = false;
+  $('recordBtn').textContent = "开始录音";
+  $('recordBtn').className = "record-btn idle";
+
+  const fd = new FormData();
+  fd.append('file', blob, `recording_${Date.now()}.webm`);
+  fd.append('model', currentModelName());
+  await doTranscribe(fd);
+}
+
+function uploadAudio(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('model', currentModelName());
+  doTranscribe(fd);
+  event.target.value = '';
+}
+
+async function doTranscribe(fd) {
+  setStatus("正在上传并转写（首次使用需下载模型，可能较慢）...");
+  $('transcriptMeta').textContent = "";
+  try {
+    const res = await fetch('/api/transcribe', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    lastTranscript = data.text;
+    lastStartStr = data.recorded_at;
+    lastEndStr = data.recorded_at;
+    currentModel = currentModelName();
+    $('transcript').value = lastTranscript;
+    $('transcriptMeta').textContent = `转写耗时 ${data.elapsed}s | 模型: ${currentModel} | 时间: ${data.recorded_at}`;
+    setStatus("转写完成，可点击 [生成纪要]");
+  } catch (e) {
+    setStatus("转写失败: " + e.message, true);
+  }
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  $('timer').textContent = "00:00";
+}
+
+// ---------- 生成纪要 ----------
+async function generateMinutes() {
+  const text = $('transcript').value.trim();
+  if (!text) { setStatus("请先录音或输入转写文本", true); return; }
+  $('btnGenerate').disabled = true;
+  $('btnGenerate').textContent = "生成中...";
+  $('generateError').textContent = "";
+  setStatus("正在调用 AI 生成需求调研纪要...");
+  try {
+    const payload = {
+      text: text,
+      backend: $('backend').value,
+      api_key: $('apiKey').value.trim(),
+      base_url: $('baseUrl').value.trim(),
+      model: $('openaiModel').value.trim(),
+      start_time: lastStartStr,
+      end_time: lastEndStr,
+    };
+    // 保存用户设置到本地配置文件
+    saveSettings({
+      backend: $('backend').value,
+      api_key: $('apiKey').value.trim(),
+      openai_base_url: $('baseUrl').value.trim(),
+      openai_model: $('openaiModel').value.trim(),
+      whisper_model: $('model').value,
+    });
+    const res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    $('minutes').value = data.minutes;
+    setStatus("需求调研纪要生成完成，可选择格式导出");
+  } catch (e) {
+    setStatus("生成失败: " + e.message, true);
+    $('generateError').textContent = e.message;
+  } finally {
+    $('btnGenerate').disabled = false;
+    $('btnGenerate').textContent = "🤖 生成纪要";
+  }
+}
+
+// ---------- 导出 ----------
+async function exportMinutes() {
+  const content = $('minutes').value.trim();
+  if (!content) { setStatus("请先生成纪要", true); return; }
+  setStatus("正在导出...");
+  try {
+    const res = await fetch('/api/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ minutes: content, fmt: $('exportFmt').value })
+    });
+    if (!res.ok) {
+      const d = await res.json();
+      throw new Error(d.error || res.statusText);
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename\*?=(?:UTF-8'')?"?([^";]+)/i);
+    const filename = m ? decodeURIComponent(m[1]) : `minutes_${Date.now()}.${$('exportFmt').value}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    setStatus("导出成功: " + filename);
+  } catch (e) {
+    setStatus("导出失败: " + e.message, true);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
