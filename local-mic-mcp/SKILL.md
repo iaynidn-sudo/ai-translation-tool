@@ -78,6 +78,7 @@ local-mic-mcp/
 1. **WorkBuddy 自身生成（默认/优先）**：`mic_generate` 返回「转写文本 + 该模式的 SYSTEM_PROMPT」，由 WorkBuddy 的模型按模式产出结构化结果。零新依赖、不需 API key。
 2. **LLM 兜底（WorkBuddy 未接入时自动启用）**：若配置了 LLM 环境变量，`mic_generate` 会**在技能内直接调用 LLM** 生成结果再返回；即使脱离 WorkBuddy 单独跑也能出成品。
    - 读取顺序：`MIC_LLM_BASE_URL` / `MIC_LLM_API_KEY` / `MIC_LLM_MODEL`，未设置时**复用**项目的 `APP_OPENAI_BASE_URL` / `APP_OPENAI_API_KEY` / `APP_OPENAI_MODEL`（兼容 OpenAI 接口）。
+   - LLM 兜底通过 `httpx`（mcp 已自带）直接请求 `/chat/completions`，**无需额外安装 `openai` 包**；调用失败会优雅回退为「转写 + 提示词」交给 WorkBuddy。
    - 仅当这些变量存在时才走 LLM 路径；否则一律回退为「转写 + 提示词」交给 WorkBuddy。
 
 > 对话里代理应在 `mic_stop` 后**询问用户用哪种 mode**（默认业务需求调研），再调 `mic_generate(mode=...)`；若用户直接说「整理成会议纪要」，代理传 `mode="meeting_minutes"` 即可。

@@ -195,27 +195,36 @@ DEFAULT_MODE = "business_requirement"
 
 
 def _llm_generate(text: str, system_prompt: str) -> Optional[str]:
-    """尝试用 OpenAI 兼容接口生成。未配置或不可用则返回 None（交由 WorkBuddy 生成）。"""
+    """尝试用 OpenAI 兼容接口生成。未配置或不可用则返回 None（交由 WorkBuddy 生成）。
+    使用 httpx（mcp 已带）直接打 /chat/completions，无需额外安装 openai 包。"""
+    import json
     base = os.environ.get("MIC_LLM_BASE_URL") or os.environ.get("APP_OPENAI_BASE_URL")
     key = os.environ.get("MIC_LLM_API_KEY") or os.environ.get("APP_OPENAI_API_KEY")
     model = os.environ.get("MIC_LLM_MODEL") or os.environ.get("APP_OPENAI_MODEL") or "gpt-4o-mini"
     if not (base and key):
         return None
+    url = base.rstrip("/") + "/chat/completions"
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": text},
+        ],
+        "temperature": 0.3,
+    }
     try:
-        from openai import OpenAI
-    except Exception:
-        return None
-    try:
-        client = OpenAI(base_url=base, api_key=key)
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text},
-            ],
-            temperature=0.3,
-        )
-        return (resp.choices[0].message.content or "").strip()
+        try:
+            import httpx
+            resp = httpx.post(url, headers=headers, json=payload, timeout=120, verify=False)
+            resp.raise_for_status()
+            data = resp.json()
+        except ImportError:
+            import urllib.request
+            req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=120) as r:  # noqa: S310
+                data = json.loads(r.read().decode("utf-8"))
+        return (data["choices"][0]["message"]["content"] or "").strip()
     except Exception as e:
         return f"[LLM 生成失败，已回退为转写+提示词] {e}"
 
