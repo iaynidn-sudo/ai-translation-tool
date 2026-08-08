@@ -14,6 +14,7 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 import numpy as np
 import sounddevice as sd
+from typing import Optional
 from faster_whisper import WhisperModel
 from mcp.server.fastmcp import FastMCP
 
@@ -135,6 +136,120 @@ def mic_transcribe(file: str = "") -> str:
     except Exception as e:
         return f"转写失败: {e}"
     return f"【转写】\n{text}"
+
+
+# ---------------------------------------------------------------------------
+# 生成方式：录音转写后，按不同模式加工（默认"业务需求调研"）
+# 设计：优先由 WorkBuddy 自身模型生成（返回转写 + 模式提示词）；
+#       若配置了 LLM 环境变量（MIC_LLM_* 或复用 APP_OPENAI_*），技能内直接调用 LLM 兜底生成
+#       —— 即"WorkBuddy 不可用/未接入时，默认用 LLM 模型"。
+# ---------------------------------------------------------------------------
+
+GENERATION_MODES = {
+    "business_requirement": {
+        "label": "业务需求调研",
+        "prompt": (
+            "你是一名资深业务分析师。基于以下录音转写，按【业务需求调研】框架结构化整理：\n"
+            "1. 背景与目标\n2. 现状与痛点\n3. 核心需求（功能/非功能）\n"
+            "4. 干系人与职责\n5. 约束与假设\n6. 待确认问题\n"
+            "用简洁要点，不要编造转写中不存在的信息。"
+        ),
+    },
+    "customer_requirement": {
+        "label": "客户需求",
+        "prompt": (
+            "你是一名客户需求分析师。基于以下录音转写，站在客户视角提取：\n"
+            "1. 客户明确提出的需求\n2. 隐含/潜在需求\n3. 顾虑与期望\n4. 优先级判断\n"
+            "用简洁要点，并区分「已明确」与「需确认」。"
+        ),
+    },
+    "meeting_minutes": {
+        "label": "会议纪要",
+        "prompt": (
+            "你是会议纪要助手。基于以下录音转写，整理成标准会议纪要：\n"
+            "- 会议主题\n- 参与人（如可识别）\n- 关键讨论\n- 决议事项\n- 下一步行动\n"
+            "按议题/时间线组织，简洁。"
+        ),
+    },
+    "action_items": {
+        "label": "待办清单",
+        "prompt": (
+            "你是项目管理助手。从以下录音转写中提取 Action Items，每项一行，格式：\n"
+            "[事项] | 负责人 | 截止时间 | 优先级\n"
+            "无法确定的字段填 '-'。只列明确的待办，不要编造。"
+        ),
+    },
+    "summary": {
+        "label": "一句话摘要",
+        "prompt": (
+            "你是摘要助手。基于以下录音转写，用 3-5 条要点概括核心内容，每条不超过 40 字。"
+        ),
+    },
+    "transcript": {
+        "label": "纯转写",
+        "prompt": None,  # 原样返回
+    },
+}
+
+DEFAULT_MODE = "business_requirement"
+
+
+def _llm_generate(text: str, system_prompt: str) -> Optional[str]:
+    """尝试用 OpenAI 兼容接口生成。未配置或不可用则返回 None（交由 WorkBuddy 生成）。"""
+    base = os.environ.get("MIC_LLM_BASE_URL") or os.environ.get("APP_OPENAI_BASE_URL")
+    key = os.environ.get("MIC_LLM_API_KEY") or os.environ.get("APP_OPENAI_API_KEY")
+    model = os.environ.get("MIC_LLM_MODEL") or os.environ.get("APP_OPENAI_MODEL") or "gpt-4o-mini"
+    if not (base and key):
+        return None
+    try:
+        from openai import OpenAI
+    except Exception:
+        return None
+    try:
+        client = OpenAI(base_url=base, api_key=key)
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": text},
+            ],
+            temperature=0.3,
+        )
+        return (resp.choices[0].message.content or "").strip()
+    except Exception as e:
+        return f"[LLM 生成失败，已回退为转写+提示词] {e}"
+
+
+@mcp.tool()
+def mic_generate(mode: str = DEFAULT_MODE, file: str = "") -> str:
+    """录音转写后，按指定「生成方式」加工文本。默认 mode=business_requirement（业务需求调研）。
+    可用 mode：business_requirement(业务需求调研) / customer_requirement(客户需求) / meeting_minutes(会议纪要) / action_items(待办清单) / summary(一句话摘要) / transcript(纯转写)。
+    行为：若配置了 MIC_LLM_*（或复用 APP_OPENAI_*）环境变量，技能内直接调用 LLM 生成结果；否则返回转写文本 + 模式提示词，交由 WorkBuddy 自身模型生成。"""
+    if mode not in GENERATION_MODES:
+        return f"未知 mode='{mode}'。可选：{', '.join(GENERATION_MODES.keys())}"
+    path = file or _state.get("last_path", "")
+    if not path:
+        return "未指定文件，且没有最近保存的录音。请先录音并 mic_stop，或传入 file 参数。"
+    if not os.path.exists(path):
+        return f"文件不存在: {path}"
+    try:
+        text = transcribe_file(path)
+    except Exception as e:
+        return f"转写失败: {e}"
+    if mode == "transcript" or not GENERATION_MODES[mode]["prompt"]:
+        return f"【纯转写】\n{text}"
+    sys_prompt = GENERATION_MODES[mode]["prompt"]
+    label = GENERATION_MODES[mode]["label"]
+    generated = _llm_generate(text, sys_prompt)
+    if generated:
+        return f"【{label}】\n{generated}\n\n--- 原始转写 ---\n{text}"
+    # 兜底：交给 WorkBuddy 自身模型生成
+    return (
+        f"【转写】\n{text}\n\n"
+        f"--- 请按以下模式生成（WorkBuddy 自身模型）---\n"
+        f"MODE: {mode} ({label})\n"
+        f"SYSTEM_PROMPT:\n{sys_prompt}"
+    )
 
 
 if __name__ == "__main__":
