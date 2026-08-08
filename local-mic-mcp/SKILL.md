@@ -49,7 +49,7 @@ local-mic-mcp/
 ```
 "<venv>/Scripts/python.exe" <目标路径>/test_client.py
 ```
-期望输出：`TOOLS: ['mic_start', 'mic_stop', 'mic_status', 'mic_transcribe']` 且 `STDIO_HANDSHAKE_OK`。
+期望输出：`TOOLS: ['mic_start', 'mic_stop', 'mic_status', 'mic_transcribe', 'mic_generate']` 且 `STDIO_HANDSHAKE_OK`。
 此脚本用 `mcp.client.stdio` 真实拉起 server 并 list_tools + 调 mic_status，等价于 WorkBuddy 加载时的握手。
 
 ## 使用（对话里）
@@ -99,5 +99,6 @@ local-mic-mcp/
 - 转写报 `cublas64_12.dll` → 确认 server.py 里 `device="cpu"`。
 - `mic_stop` 超时 → 大概率跨回合调用了（MCP 进程重启，状态丢失）。同一回合内调用即可。
 - `mic_transcribe` 超时 → 文件太大（>10 分钟），CPU 转写耗时超 MCP 超时。走独立脚本转写。
+- 默认 whisper 模型为 `small`；若其缓存损坏或无法联网下载，可设 `MIC_MODEL=base`（或本地路径/其它尺寸）临时改用已缓存模型，无需改代码。
 - `mic_generate` 返回「[LLM 生成失败…]」→ 检查 `MIC_LLM_*` / `APP_OPENAI_*` 是否配置正确、网络与 key 是否有效；失败时会自动回退为「转写 + 模式提示词」交给 WorkBuddy 生成。
 - `mic_generate` 未知 mode → 用 `business_requirement` 等上表 6 个值之一。

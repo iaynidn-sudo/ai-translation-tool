@@ -35,7 +35,9 @@ _state = {
 }
 _model = None
 _model_lock = threading.Lock()
-WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "small")
+# 模型名可通过环境变量覆盖：优先 MIC_MODEL，其次兼容旧名 WHISPER_MODEL，默认 small。
+# 若默认 small 缓存损坏且无法联网，可设 MIC_MODEL=base 或指向本地缓存/路径。
+WHISPER_MODEL = os.environ.get("MIC_MODEL") or os.environ.get("WHISPER_MODEL", "small")
 
 
 def get_model():
